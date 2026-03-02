@@ -1,0 +1,119 @@
+import os
+import asyncio
+import edge_tts  # 文本转语音
+import sys
+from pathlib import Path
+
+class DigitalHumanGenerator:
+    def __init__(self, sadtalker_path="SadTalker"):
+        """初始化数字人生成器"""
+        self.sadtalker_path = Path(sadtalker_path)
+        self.output_path = Path("output")
+        self.output_path.mkdir(exist_ok=True)
+        
+        # 检查环境
+        if not self.sadtalker_path.exists():
+            raise Exception("SadTalker目录不存在，请先克隆项目")
+    
+    async def text_to_speech(self, text, audio_path="temp_audio.wav"):
+        """步骤1：文本转语音（使用edge-tts，免费）"""
+        print(f"🎙️ 正在生成语音: {text[:30]}...")
+        
+        # 选择中文语音
+        communicate = edge_tts.Communicate(text, "zh-CN-XiaoxiaoNeural")
+        await communicate.save(audio_path)
+        
+        print(f"✅ 语音文件已保存: {audio_path}")
+        return audio_path
+    
+    def generate_video(self, photo_path, audio_path, result_dir=None):
+        """步骤2：调用SadTalker生成视频"""
+        if result_dir is None:
+            result_dir = self.output_path
+        
+        print(f"🎬 正在生成数字人视频...")
+        print(f"   照片: {photo_path}")
+        print(f"   音频: {audio_path}")
+        
+        # 构建SadTalker命令
+        cmd = [
+            sys.executable,  # Python解释器路径
+            str(self.sadtalker_path / "inference.py"),
+            "--driven_audio", audio_path,
+            "--source_image", photo_path,
+            "--result_dir", str(result_dir),
+            "--still",  # 保持头部稳定
+            "--preprocess", "full",  # 全图预处理
+            "--batch_size", "1"
+        ]
+        
+        # 执行生成
+        try:
+            import subprocess
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=self.sadtalker_path)
+            
+            if result.returncode == 0:
+                # 查找生成的视频
+                video_files = list(Path(result_dir).glob("*.mp4"))
+                if video_files:
+                    video_path = video_files[-1]  # 取最新生成的
+                    print(f"✅ 视频生成成功: {video_path}")
+                    return str(video_path)
+                else:
+                    raise Exception("未找到生成的视频文件")
+            else:
+                print(f"❌ 生成失败: {result.stderr}")
+                raise Exception(f"SadTalker执行出错: {result.stderr}")
+                
+        except Exception as e:
+            print(f"❌ 错误: {e}")
+            raise
+    
+    async def generate(self, photo_path, text, cleanup=True):
+        """主流程：文本→语音→视频"""
+        try:
+            # 生成语音
+            audio_path = await self.text_to_speech(text)
+            
+            # 生成视频
+            video_path = self.generate_video(photo_path, audio_path)
+            
+            # 清理临时文件
+            if cleanup and os.path.exists(audio_path):
+                os.remove(audio_path)
+            
+            print(f"🎉 数字人口播视频生成完成！")
+            print(f"📁 文件路径: {video_path}")
+            
+            return video_path
+            
+        except Exception as e:
+            print(f"❌ 生成失败: {e}")
+            return None
+
+# ==================== 使用示例 ====================
+if __name__ == "__main__":
+    # 初始化生成器
+    generator = DigitalHumanGenerator(sadtalker_path="D:\SadTalker")
+    
+    # 输入配置
+    YOUR_PHOTO = "D:\SadTalker\examples\source_image\happy.png"  # 替换为你的照片路径
+    SPEECH_TEXT = "大家好，我是你的数字人分身。今天很高兴能和大家见面，希望我的介绍能帮助你更好地了解数字人技术。"
+    
+    # 检查文件
+    if not os.path.exists(YOUR_PHOTO):
+        print(f"❌ 照片文件不存在: {YOUR_PHOTO}")
+        exit(1)
+    
+    # 运行生成
+    print("="*50)
+    print("数字人口播视频生成工具")
+    print("="*50)
+    
+    # 异步执行
+    video_result = asyncio.run(generator.generate(YOUR_PHOTO, SPEECH_TEXT))
+    
+    if video_result:
+        print(f"\n✨ 成功！视频已保存至: {video_result}")
+    else:
+        print("\n💔 生成失败，请检查错误信息")
