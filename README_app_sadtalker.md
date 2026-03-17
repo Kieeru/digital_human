@@ -1,4 +1,4 @@
-# 文本+照片-->数字人（使用edge-tts默认音色，无音色克隆功能）
+# 文本+照片-->数字人视频（使用edge-tts默认音色，无音色克隆功能）
 1.	git clone https://github.com/Kieeru/digital_human.git
 2.	将checkpoints与gfpgan复制到根目录下
 3.	下载requirements_app_sadtalker.txt依赖
